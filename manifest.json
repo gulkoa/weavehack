@@ -1,0 +1,18 @@
+{
+  "name": "weather-mcp",
+  "version": "1.0.0",
+  "description": "Weather forecast MCP server using Open-Meteo API",
+  "author": "MCP Weather Server",
+  "license": "MIT",
+  "server": {
+    "command": "python",
+    "args": ["weather_server.py"],
+    "env": {}
+  },
+  "tools": [
+    {
+      "name": "get_forecast",
+      "description": "Get weather forecast for a specific location using latitude and longitude coordinates"
+    }
+  ]
+}

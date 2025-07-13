@@ -1,0 +1,94 @@
+openapi: 3.0.0
+info:
+  title: Weather API MCP
+  description: MCP server for weather forecast data
+  version: 1.0.0
+servers:
+  - url: https://api.open-meteo.com/v1
+    description: Open-Meteo Weather API
+paths:
+  /forecast:
+    get:
+      operationId: get_forecast
+      summary: Get weather forecast
+      description: Get weather forecast for a specific location
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+          description: Latitude coordinate
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+          description: Longitude coordinate
+        - name: current
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "temperature_2m,relative_humidity_2m,wind_speed_10m"
+          description: Current weather variables
+        - name: hourly
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "temperature_2m,precipitation_probability"
+          description: Hourly weather variables
+        - name: daily
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "temperature_2m_max,temperature_2m_min,precipitation_sum"
+          description: Daily weather variables
+        - name: timezone
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "auto"
+          description: Timezone for the forecast
+      responses:
+        '200':
+          description: Weather forecast data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                  longitude:
+                    type: number
+                  timezone:
+                    type: string
+                  current:
+                    type: object
+                  hourly:
+                    type: object
+                  daily:
+                    type: object
+components:
+  schemas:
+    WeatherForecast:
+      type: object
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+        timezone:
+          type: string
+        current:
+          type: object
+        hourly:
+          type: object
+        daily:
+          type: object
