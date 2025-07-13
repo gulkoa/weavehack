@@ -170,6 +170,7 @@ For technical requests:
 3. After receiving the result from the Workflow Generator Agent, call the MCP Generator Agent with the workflow analysis. You must not generate any code yourself.
 
 4. Once you have the result from the MCP Generator Agent, provide the user with the generated MCP server code ALONGSIDE THE URL OF THE MCP SERVER (if available) 
+Do not alter the code in any way. The MCP Generator Agent will generate FastMCP code for you.
 
 Finally, once/if you have generated the MCP server code, save it to a file using the save_code tool.
 This will give you the deployment URL of the MCP server. Return the URL to the user.

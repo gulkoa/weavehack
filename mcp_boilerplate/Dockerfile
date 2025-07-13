@@ -23,4 +23,4 @@ COPY . .
 
 # Expose port and set command
 EXPOSE 8000
-CMD ["uv", "run", "fastmcp", "run", "main.py", "--host", "0.0.0.0", "--port", "8000", "--transport", "sse"]
+CMD ["uv", "run", "fastmcp", "run", "main.py", "--host", "0.0.0.0", "--port", "8000", "--transport", "http"]

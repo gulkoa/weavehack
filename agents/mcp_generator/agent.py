@@ -71,9 +71,6 @@ Guidelines for code generation:
 - Add logging or status updates for complex workflows
 - Use descriptive variable names
 - Include examples in docstrings
-- YOU ONLY HAVE ACCESS TO THE FOLLOWING LIBRARIES (apart from standard libraries):
-    - FastMCP
-    - requests
 
 3. Implement proper FastMCP decorators and structures for each function.
 
