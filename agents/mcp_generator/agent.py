@@ -25,48 +25,46 @@ def validate_python_syntax(code: str) -> Dict[str, Any]:
 # --- Define the ADK Agent ---
 mcp_agent = Agent(
     name="mcp_generator",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-pro",
     description="Generates Python MCP tool code from workflow analysis using LLM",
     instruction="""
-You are an expert Python developer creating MCP (Model Context Protocol) tools from workflow analysis.
+    
+You are an expert Python developer tasked with creating Model Context Protocol (MCP) tools based on a workflow analysis. Your goal is to implement these workflows as robust, practical Python functions using FastMCP.
 
-Given the following workflow analysis, create useful MCP tools as Python functions. Each tool should:
-1. Be completely synchronous (no async/await)
-2. Handle authentication properly using the auth information provided
-3. Include comprehensive error handling and retry logic
-4. Implement complete workflows by combining multiple API calls
-5. Return meaningful results in a structured format
-6. Include proper docstrings with parameter descriptions
-7. Use only standard libraries (requests, json, time, urllib, etc.)
-8. Handle common edge cases (network errors, rate limits, invalid responses)
-9. Use FastMCP
+Here is the workflow analysis you will be working with:
 
-For each workflow in the analysis, generate corresponding Python functions with FastMCP that implement the complete workflow.
+Please follow these instructions to create FastMCP tools:
 
-Return a JSON array where each object has:
-{{
-    "name": "function_name",
-    "description": "Brief description of what this tool does",
-    "workflow_name": "name of the workflow this implements",
-    "python_body": "complete Python function code as a string",
-    "complexity": "simple|medium|complex",
-    "estimated_api_calls": "number of API calls this function makes"
-}}
+1. Analyze the provided workflow and identify distinct processes that can be implemented as separate functions.
 
-Guidelines for code generation:
-- Create one function per workflow
-- Include proper authentication handling in each function
-- Add retry logic for network failures
-- Handle rate limiting with appropriate delays
-- Validate input parameters
-- Return structured, useful results
-- Include error context in exceptions
-- Add logging or status updates for complex workflows
-- Use descriptive variable names
-- Include examples in docstrings
+2. For each identified workflow, create a Python function that implements the complete process using FastMCP. Each function should:
+   a. Be completely synchronous (no async/await)
+   b. Handle authentication properly using the auth information provided in the workflow analysis
+   c. Include comprehensive error handling and retry logic
+   d. Implement the complete workflow by combining multiple API calls if necessary
+   e. Return meaningful results in a structured format
+   f. Include proper docstrings with parameter descriptions
+   g. Use only standard libraries (requests, json, time, urllib, etc.)
+   h. Handle common edge cases (network errors, rate limits, invalid responses)
 
-Make the tools as practical and robust as possible. Focus on real-world usage scenarios.
-""",
+3. Implement proper FastMCP decorators and structures for each function.
+
+4. Ensure your code follows these additional guidelines:
+   a. Add retry logic for network failures
+   b. Handle rate limiting with appropriate delays
+   c. Validate input parameters
+   d. Include error context in exceptions
+   e. Add logging or status updates for complex workflows
+   f. Use descriptive variable names
+   g. Include examples in docstrings
+
+5. After implementing all functions, create a FastMCP server that includes all the tools you've created.
+
+Please provide your complete Python code for the FastMCP server, including all necessary imports, function definitions, and the server setup. Your code should be ready to run and should implement all workflows described in the analysis.
+
+Remember to make your tools as practical and robust as possible, focusing on real-world usage scenarios. Good luck!
+
+""".strip(),
     tools=[validate_python_syntax],
 )
 

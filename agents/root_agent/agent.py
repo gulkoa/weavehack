@@ -72,30 +72,27 @@ llm = LLM(
 crewai_agent = CrewAIAgent(
     role="Root Agent",
     goal="Return python code for an MCP server for a given API using tools",
-    backstory="""You are a root coordination agent that helps users create MCP servers through a multi-step process. You have access to three specialized agents as tools:
+    backstory="""
 
-- Document Extractor Agent: Extracts API documentation
-- Workflow Generator Agent: Analyzes APIs and generates workflow descriptions  
-- MCP Generator Agent: Creates MCP server implementations
+You are a root coordination agent responsible for helping users create MCP servers through a multi-step process. You have access to three specialized agents: Document Extractor Agent, Workflow Generator Agent, and MCP Generator Agent. Your task is to coordinate between these agents and interact with the user to accomplish the goal of creating an MCP server.
 
-You can also engage in general conversation with users who want to chat. For technical requests, you'll coordinate between the specialized agents to accomplish tasks through these steps:
+When you receive user input, analyze it to determine if it's a technical request related to creating an MCP server or a general conversation. Here's how to handle each situation:
 
-1. Documentation Extraction: Extract and understand API documentation
-2. Workflow Analysis: Analyze the API to identify key workflows and patterns  
-3. MCP Server Generation: Generate the MCP server code based on the analysis
-4. Integration: Help users integrate and test the generated server
+For technical requests:
+1. If the user's request is related to creating an MCP server, begin the process by calling the Document Extractor Agent.
 
-Please note that the Documentation Extractor Agent is expensive to use, so please use it sparingly.
+2. Once you receive the result from the Document Extractor Agent, call the Workflow Generator Agent with the extracted documentation.
 
-NOTE:
-1. Document Extractor Agent does not need context from previous steps or other agents.
-2. Workflow Generator Agent does ALWAYS needs context from the Document Extractor Agent.
-3. MCP Generator Agent does ALWAYS needs context from the Workflow Generator Agent.
+3. After receiving the result from the Workflow Generator Agent, call the MCP Generator Agent with the workflow analysis. You must not generate any code yourself.
 
-DO NOT CALL THE AGENTS WITHOUT PROPER CONTEXT.
+4. Once you have the result from the MCP Generator Agent, provide the user with the generated MCP server code
 
+Important notes:
+- The Document Extractor Agent is expensive to use, so use it sparingly and only when necessary.
+- Always provide context from the previous agent to the next agent in the sequence.
+- Do not call agents without proper context from the previous step.
 
-""",
+""".strip(),
     tools=[extract_documentation, generate_workflows, generate_mcp],
     verbose=True,
     llm=llm
@@ -226,7 +223,7 @@ class RootAgent(A2AServer):
         )
         output = crew.kickoff({"user_input": question})
         print(str(output))
-        return output.python_code
+        return output.pydantic.python_code
 
 
 if __name__ == "__main__":
