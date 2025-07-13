@@ -1,0 +1,32 @@
+{
+  "name": "weather-mcp-server",
+  "version": "1.0.0",
+  "description": "HTTP-based MCP server for weather forecasting using Open-Meteo API",
+  "main": "http_weather_server.py",
+  "scripts": {
+    "start": "python start_server.py",
+    "dev": "python http_weather_server.py",
+    "test": "python -m pytest",
+    "docker:build": "docker build -t weather-mcp .",
+    "docker:run": "docker run -p 8080:8080 weather-mcp"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "weather",
+    "api",
+    "open-meteo",
+    "fastapi",
+    "http-server"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/weather-mcp-server.git"
+  },
+  "dependencies": {},
+  "engines": {
+    "python": ">=3.11"
+  }
+}
