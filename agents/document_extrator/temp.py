@@ -8,7 +8,7 @@ from typing import Dict
 from google.adk.agents import Agent
 from python_a2a import A2AServer, TaskState, TaskStatus, agent, run_server, skill
 
-from agents.doc_extrator import extract_documentation as original_extract_documentation
+from .doc_extrator import extract_documentation as original_extract_documentation
 
 
 # --- ADK-compatible wrapper ---

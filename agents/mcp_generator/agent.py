@@ -6,6 +6,10 @@ from typing import Any, Dict, List, Optional
 from google.adk.agents import Agent
 from python_a2a import A2AServer, TaskState, TaskStatus, agent, run_server, skill
 
+from google.adk.sessions import InMemorySessionService
+from google.adk.runners import Runner
+from google.genai import types
+
 
 def validate_python_syntax(code: str) -> Dict[str, Any]:
     """Validates Python code syntax and returns validation result."""
@@ -94,6 +98,25 @@ class MCPCodeGeneratorAgent(A2AServer):
             }
         except Exception as e:
             return {"valid": False, "error": str(e)}
+        
+    
+    def ask(self, question: str):
+        """Ask a question to the Gemini agent using ADK session and runner."""
+        session_service = InMemorySessionService()
+        session = session_service.create_session_sync(
+            app_name="my_app",
+            user_id="user1",
+            session_id="mysession"
+        )
+        runner = Runner(agent=self.adk_agent, app_name="my_app", session_service=session_service)
+        content = types.Content(role='user', parts=[types.Part(text=question)])
+
+        # 3. Send the question and print the response
+        events = runner.run(user_id="user1", session_id="mysession", new_message=content)
+        for event in events:
+            if event.is_final_response():
+                return event.content.parts[0].text
+
 
     @skill(
         name="Generate MCP Tools",
@@ -112,7 +135,7 @@ class MCPCodeGeneratorAgent(A2AServer):
         """
         try:
             # Use the ADK agent to generate MCP tools
-            result = self.adk_agent.ask(
+            result = self.ask(
                 f"Generate MCP tools from this workflow analysis:\n\n{workflow_analysis}"
             )
 
