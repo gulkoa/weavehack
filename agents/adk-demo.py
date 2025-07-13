@@ -1,44 +1,39 @@
-import datetime
+# doc_agent_server.py
+
 import os
-
-# Import the original extract_documentation function
 import sys
-from zoneinfo import ZoneInfo
+from typing import Dict
 
+import uvicorn
+from a2a.server.apps import A2AFastAPIApplication
+from a2a.types import AgentCard, AgentSkill
+from fastapi import FastAPI
+
+# --- ADK and A2A imports ---
 from google.adk.agents import Agent
 
 from agents.doc_extrator import extract_documentation as original_extract_documentation
 
 
-def extract_documentation(query: str) -> dict:
-    """ADK-compatible wrapper for the original extract_documentation function.
-
-    Extracts comprehensive documentation for APIs, websites, or services based on user query.
-    This function uses advanced documentation extraction techniques to find and structure
-    relevant API documentation, endpoints, code examples, and technical details.
+# --- ADK-compatible wrapper ---
+def extract_documentation(query: str) -> Dict:
+    """
+    ADK-compatible wrapper for the original extract_documentation function.
 
     Args:
-        query (str): The website, API name, or service to extract documentation for.
-                    Can be a URL, service name (e.g., 'TMDB'), or descriptive request.
+        query (str): The website, API name, or service.
 
     Returns:
-        dict: A structured dictionary containing:
-            - status: "success" or "error"
-            - documentation: The extracted documentation content (if successful)
-            - source: Information about the documentation source
-            - error_message: Error details (if unsuccessful)
+        dict: Structured response with status, documentation, and errors.
     """
     try:
-        # Call the original extract_documentation function
         result = original_extract_documentation(query)
-
         return {
             "status": "success",
             "documentation": str(result),
             "source": f"Documentation extracted for: {query}",
             "query": query,
         }
-
     except Exception as e:
         return {
             "status": "error",
@@ -47,7 +42,7 @@ def extract_documentation(query: str) -> dict:
         }
 
 
-# Create a specialized documentation agent
+# --- Define the ADK Agent ---
 doc_agent = Agent(
     name="doc_agent",
     model="gemini-2.0-flash",
@@ -55,3 +50,25 @@ doc_agent = Agent(
     instruction="Use the extract_documentation tool to answer API-related queries and documentation requests.",
     tools=[extract_documentation],
 )
+
+# --- Define AgentSkill and AgentCard for A2A ---
+skill = AgentSkill(
+    id="extract_documentation",
+    name="API Documentation Extractor",
+    description="Extracts comprehensive API documentation for websites and services.",
+)
+
+agent_card = AgentCard(
+    name="doc_agent",
+    description="Provides API documentation details for websites and services.",
+    url="http://localhost:10001/",
+    version="1.0.0",
+    skills=[skill],
+)
+
+# --- Expose agent as an A2A FastAPI server ---
+server = A2AFastAPIApplication(agent_card=agent_card, http_handler=doc_agent)
+
+if __name__ == "__main__":
+    print("Starting doc_agent server at http://localhost:10001/")
+    uvicorn.run(server.build(), host="localhost", port=10001)
