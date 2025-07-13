@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "crewai>=0.141.0",
     "exa-py>=1.14.16",
+    "google-adk>=1.6.1",
     "openai>=1.95.1",
     "python-dotenv>=1.1.1",
     "stagehand-py>=0.3.10",
