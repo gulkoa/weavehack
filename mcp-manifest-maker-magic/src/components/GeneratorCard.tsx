@@ -158,7 +158,7 @@ const GeneratorCard = () => {
             <div className="bg-muted rounded-none p-4 border border-border max-h-96 overflow-y-auto">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium text-foreground">
-                  MCP Server Code
+                  Response
                 </label>
                 <button
                   onClick={() => copyToClipboard(result.downloadUrl)}
