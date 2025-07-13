@@ -24,7 +24,7 @@ def extract_documentation(query: str) -> Dict:
     """
     try:
         result = original_extract_documentation(query)
-        return {
+        return result if isinstance(result, dict) else {
             "status": "success",
             "documentation": str(result),
             "source": f"Documentation extracted for: {query}",
@@ -75,16 +75,15 @@ class DocumentationAgent(A2AServer):
             dict: Structured response with status, documentation, and metadata.
         """
         try:
-            # Use the ADK agent to process the query
-            result = self.adk_agent.ask(f"Extract documentation for: {query}")
-
-            return {
+            # Use the original extract_documentation function 
+            result = original_extract_documentation(query)
+            return result if isinstance(result, dict) else {
                 "status": "success",
                 "documentation": str(result),
                 "source": f"Documentation extracted for: {query}",
                 "query": query,
-                "extraction_method": "adk_gemini",
-                "model": "gemini-2.0-flash",
+                "extraction_method": "crewai",
+                "model": "openrouter/deepseek",
             }
         except Exception as e:
             return {

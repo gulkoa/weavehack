@@ -20,7 +20,7 @@ from tools.doc_extrator_tools import (
 # )
 
 llm = LLM(
-    model="openrouter/deepseek/deepseek-chat-v3-0324:free",
+    model="openai/gpt-4.1",
     timeout=100,
     api_base="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY"),
@@ -28,8 +28,9 @@ llm = LLM(
 # llm = LLM(
 #     model="openai/deepseek-ai/DeepSeek-V3-0324",
 #     api_base="https://api.inference.wandb.ai/v1",
+#     timeout=1000,
 #     api_key=os.getenv("WANDB_OPENAI_API_KEY"),
-#     extra_headers={"OpenAI-Project": "rochan-hm-self/quickstart_playground"},
+#     extra_headers={"OpenAI-Project": "gulkoa/my_project_name"},
 # )
 
 # Setup the agent
@@ -54,7 +55,7 @@ Your job is to:
 )
 
 
-def extract_documentation(user_input: str) -> str:
+def extract_documentation(user_input: str) -> dict:
     task = Task(
         description="""Analyze this user request and extract the relevant documentation: "{user_input}"
 
@@ -72,7 +73,12 @@ Instructions:
         tasks=[task],
         verbose=True,
     )
-    return crew.kickoff({"user_input": user_input})
+    result = crew.kickoff({"user_input": user_input})
+    return {
+        "status": "success",
+        "documentation": str(result),
+        "errors": []
+    }
 
 
 if __name__ == "__main__":

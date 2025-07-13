@@ -28,12 +28,8 @@ def extract_documentation(query: str) -> Dict:
     """
     try:
         result = original_extract_documentation(query)
-        return {
-            "status": "success",
-            "documentation": str(result),
-            "source": f"Documentation extracted for: {query}",
-            "query": query,
-        }
+        # The function now returns a dict, so we can return it directly
+        return result
     except Exception as e:
         return {
             "status": "error",
@@ -62,6 +58,7 @@ class DocumentationAgent(A2AServer):
     def __init__(self):
         super().__init__()
         self.adk_agent = doc_agent
+        print(f"[DocumentationAgent] Initialized with ADK agent: {self.adk_agent.name}")
 
     @skill(
         name="Extract API Documentation",
@@ -78,18 +75,13 @@ class DocumentationAgent(A2AServer):
         Returns:
             dict: Structured response with status, documentation, and metadata.
         """
+        print(f"\n[DocumentationAgent.extract_documentation] Called with query: '{query}'")
         try:
-            # Use the ADK agent to process the query
-            result = self.ask(f"Extract documentation for: {query}")
-
-            return {
-                "status": "success",
-                "documentation": str(result),
-                "source": f"Documentation extracted for: {query}",
-                "query": query,
-                "extraction_method": "adk_gemini",
-                "model": "gemini-2.0-flash",
-            }
+            # Use the original extract_documentation function which now returns a dict
+            print(f"[DocumentationAgent.extract_documentation] Calling original_extract_documentation...")
+            result = original_extract_documentation(query)
+            print(f"[DocumentationAgent.extract_documentation] Got result: {result}")
+            return result
         except Exception as e:
             return {
                 "status": "error",
@@ -101,6 +93,8 @@ class DocumentationAgent(A2AServer):
     def handle_task(self, task):
         """Handle incoming A2A tasks for documentation extraction."""
         try:
+            print(f"\n[DocumentationAgent] Received task: {task}")
+            print(f"[DocumentationAgent] Task message: {task.message}")
             # Extract query from the task message
             message_data = task.message or {}
             content = message_data.get("content", {})
@@ -109,6 +103,8 @@ class DocumentationAgent(A2AServer):
                 text = content.get("text", "")
             else:
                 text = str(content)
+
+            print(f"[DocumentationAgent] Extracted text: '{text}'")
 
             if not text.strip():
                 task.status = TaskStatus(
@@ -124,19 +120,26 @@ class DocumentationAgent(A2AServer):
                 return task
 
             # Extract documentation using our ADK-powered skill
+            print(f"[DocumentationAgent] Calling extract_documentation with: '{text.strip()}'")
             result = self.extract_documentation(text.strip())
+            print(f"[DocumentationAgent] Result: {result}")
 
             # Format response based on result status
             if result["status"] == "success":
-                response_text = f"**Documentation for {result['query']}**\n\n{result['documentation']}"
+                response_text = f"**Documentation for {text.strip()}**\n\n{result['documentation']}"
             else:
-                response_text = f"**Error extracting documentation for {result['query']}**\n\n{result['error_message']}\n\n{result.get('suggested_action', '')}"
+                response_text = f"**Error extracting documentation for {text.strip()}**\n\n{result['error_message']}\n\n{result.get('suggested_action', '')}"
 
             # Create response
+            print(f"[DocumentationAgent] Sending response: {response_text[:100]}...")
             task.artifacts = [{"parts": [{"type": "text", "text": response_text}]}]
             task.status = TaskStatus(state=TaskState.COMPLETED)
+            print(f"[DocumentationAgent] Task completed successfully")
 
         except Exception as e:
+            print(f"[DocumentationAgent] Error processing task: {str(e)}")
+            import traceback
+            traceback.print_exc()
             task.status = TaskStatus(
                 state=TaskState.FAILED,
                 message={
@@ -170,5 +173,8 @@ class DocumentationAgent(A2AServer):
 
 if __name__ == "__main__":
     print("Starting Documentation Agent server at http://localhost:10001/")
+    print("[DocumentationAgent] Creating agent instance...")
     agent = DocumentationAgent()
+    print(f"[DocumentationAgent] Agent created: {agent}")
+    print("[DocumentationAgent] Starting A2A server...")
     run_server(agent, port=10001)

@@ -23,7 +23,8 @@ network.add("workflow_generator", "http://localhost:10002")
 network.add("mcp_generator", "http://localhost:10003")
 
 ROUTER_LLM = LLM(
-    model="openrouter/deepseek/deepseek-chat-v3-0324:free",
+    # model="openrouter/deepseek/deepseek-chat-v3-0324:free",
+    model="openai/gpt-4.1",
     timeout=1000,
     api_base="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY"),
@@ -35,25 +36,7 @@ router = AIAgentRouter(
     agent_network=network
 )
 
-root_adk_agent = Agent(
-    name="root_agent",
-    model="gemini-2.5-pro",
-    description="Main coordination agent that orchestrates the MCP server generation process",
-    instruction="""You are a root coordination agent that helps users create MCP servers through a multi-step process:
-
-1. Documentation Extraction: Extract and understand API documentation
-2. Workflow Analysis: Analyze the API to identify key workflows and patterns
-3. MCP Server Generation: Generate the MCP server code based on the analysis
-4. Integration: Help users integrate and test the generated server
-
-You coordinate between specialized agents to accomplish these tasks:
-- Document Extractor Agent: Extracts API documentation
-- Workflow Generator Agent: Analyzes APIs and generates workflow descriptions
-- MCP Generator Agent: Creates MCP server implementations
-
-For each user request, determine the next logical step in the process and route to the appropriate agent.""",
-    tools=[],
-)
+# We'll create the ADK agent inside the class so we can bind tools to it
 
 @agent(
     name="Root Agent",
@@ -63,11 +46,30 @@ For each user request, determine the next logical step in the process and route 
 class RootAgent(A2AServer):
     def __init__(self):
         super().__init__()
-        self.adk_agent = root_adk_agent
         self.current_context = {}
         self.session_states = {}  # Track session states across requests
         self.workflow_history = {}  # Track workflow progress
         self.lock = threading.Lock()  # Thread safety for state management
+        self.current_session_context = {}  # Current session context for tools
+        
+        # Create the ADK agent with function tools
+        self.adk_agent = Agent(
+            name="root_agent",
+            model="gemini-2.0-flash-exp",
+            description="Main coordination agent that orchestrates the MCP server generation process",
+            instruction="""You are a root coordination agent that helps users create MCP servers through a multi-step process.
+
+When a user asks you to create an MCP server, you MUST follow these steps IN ORDER:
+
+1. Use the extract_documentation tool to get API documentation
+2. Use the generate_workflows tool to analyze the documentation and create workflows
+3. Use the generate_mcp_server tool to generate the final MCP server code
+
+ALWAYS complete all three steps before returning a response to the user.
+
+IMPORTANT: You must execute ALL THREE tools in sequence. Do not stop after just one tool call.""",
+            tools=[self._extract_documentation_tool, self._generate_workflows_tool, self._generate_mcp_tool],
+        )
 
     def get_session_context(self, session_id: str) -> Dict:
         """Get context for a specific session."""
@@ -111,9 +113,13 @@ class RootAgent(A2AServer):
         """
         Coordinate requests across specialized agents to generate MCP servers.
 
+        You can reach out to a documentation_extractor (pulls api docs from web)
+        workflow_generator (takes in api docs and generates useful workflows)
+        and mcp_generator (writes code for mcp server)
+
         Args:
-            request (str): The user's request
-            agent_type (str): Type of agent to route to ("doc", "workflow", "mcp", "auto")
+            request (str): Fine-grained request to an agent
+            agent_type (str): Type of agent to route to ("documentation_extractor", "workflow_generator", "mcp_generator", "auto")
 
         Returns:
             dict: Response from the appropriate agent with next steps
@@ -135,13 +141,18 @@ class RootAgent(A2AServer):
                 return agent
             
             # Get the selected agent with retry
+            print(f"[RootAgent] Getting agent: {agent_type}")
             agent = self.retry_with_backoff(get_agent)
+            print(f"[RootAgent] Got agent: {agent}")
             
             # Process based on agent type and session context
             if agent_type == "document_extractor":
                 # Extract API documentation
                 def extract_docs():
-                    return agent.ask(request)
+                    print(f"[RootAgent] Sending request to document_extractor: '{request}'")
+                    response = agent.ask(request)
+                    print(f"[RootAgent] Got response from document_extractor: {response}")
+                    return response
                 
                 response = self.retry_with_backoff(extract_docs)
                 
@@ -357,14 +368,6 @@ class RootAgent(A2AServer):
             # Extract session ID for state tracking
             session_id = self._extract_session_id(task)
             
-            # Check if the request specifies a specific agent type
-            agent_type = "auto"
-            if text.strip().startswith("@"):
-                parts = text.strip().split(" ", 1)
-                if len(parts) > 1:
-                    agent_type = parts[0][1:]  # Remove @ symbol
-                    text = parts[1]
-            
             # Check for session commands
             if text.strip().lower().startswith("status"):
                 context = self.get_session_context(session_id)
@@ -382,35 +385,11 @@ class RootAgent(A2AServer):
                 task.status = TaskStatus(state=TaskState.COMPLETED)
                 return task
 
-            # Coordinate the request with session tracking
-            result = self.coordinate_request(text.strip(), agent_type, session_id)
-
-            # Format response based on result
-            if result["status"] == "success":
-                response_text = f"""**{result['message']}**
-
-**Agent:** {agent_type}
-**Session:** {result.get('session_id', 'N/A')}
-**Step:** {result.get('workflow_step', 'unknown')}
-
-**Response:**
-{result['response']}
-
-**Next Step:** {result['next_step']}"""
-                
-                if result.get('next_step') == 'complete':
-                    response_text += "\n\n🎉 **Workflow Complete!** Your MCP server has been generated successfully."
-            else:
-                response_text = f"""**❌ Error: {result['error_message']}**
-
-**Session:** {result.get('session_id', 'N/A')}
-**Current Step:** {result.get('current_step', 'unknown')}
-**Required:** {result.get('required_input', 'N/A')}
-
-**Next Action:** Complete the {result.get('next_step', 'previous')} step first."""
+            # Use the ADK agent to process the request and orchestrate the full workflow
+            result = self._run_full_workflow(text.strip(), session_id)
 
             # Create response
-            task.artifacts = [{"parts": [{"type": "text", "text": response_text}]}]
+            task.artifacts = [{"parts": [{"type": "text", "text": result}]}]
             task.status = TaskStatus(state=TaskState.COMPLETED)
 
         except Exception as e:
@@ -426,6 +405,138 @@ class RootAgent(A2AServer):
             )
 
         return task
+    
+    def _extract_documentation_tool(self, request: str) -> str:
+        """Tool function to extract documentation."""
+        try:
+            agent = network.get_agent("document_extractor")
+            if not agent:
+                return "Error: Document extractor agent not available"
+            
+            print(f"[Tool] Extracting documentation for: {request}")
+            response = agent.ask(request)
+            print(f"[Tool] Documentation extracted successfully")
+            
+            # Store in session context
+            self.current_session_context["documentation"] = response
+            return response
+        except Exception as e:
+            return f"Error extracting documentation: {str(e)}"
+    
+    def _generate_workflows_tool(self, api_docs: str) -> str:
+        """Tool function to generate workflows."""
+        try:
+            agent = network.get_agent("workflow_generator")
+            if not agent:
+                return "Error: Workflow generator agent not available"
+            
+            print(f"[Tool] Generating workflows from documentation")
+            response = agent.ask(api_docs)
+            print(f"[Tool] Workflows generated successfully")
+            
+            # Store in session context
+            self.current_session_context["workflows"] = response
+            return response
+        except Exception as e:
+            return f"Error generating workflows: {str(e)}"
+    
+    def _generate_mcp_tool(self, workflows: str) -> str:
+        """Tool function to generate MCP server."""
+        try:
+            agent = network.get_agent("mcp_generator")
+            if not agent:
+                return "Error: MCP generator agent not available"
+            
+            print(f"[Tool] Generating MCP server from workflows")
+            response = agent.ask(workflows)
+            print(f"[Tool] MCP server generated successfully")
+            
+            # Store in session context
+            self.current_session_context["mcp_server"] = response
+            return response
+        except Exception as e:
+            return f"Error generating MCP server: {str(e)}"
+    
+    def _run_full_workflow(self, request: str, session_id: str) -> str:
+        """Run the complete MCP server generation workflow using the ADK agent."""
+        # Set the current session context for tools to use
+        self.current_session_context = self.get_session_context(session_id)
+        
+        # Initialize session and runner for the ADK agent
+        session_service = InMemorySessionService()
+        session = session_service.create_session_sync(
+            app_name="root_agent_app",
+            user_id="user1",
+            session_id=session_id
+        )
+        runner = Runner(agent=self.adk_agent, app_name="root_agent_app", session_service=session_service)
+        
+        # Create the initial user message
+        initial_prompt = f"Create an MCP server for: {request}"
+        
+        content = types.Content(role='user', parts=[types.Part(text=initial_prompt)])
+        
+        # Collect all responses from the agent
+        all_responses = []
+        tool_calls = []
+        
+        # Run the agent to completion
+        print(f"[RootAgent] Starting workflow for: {request}")
+        events = runner.run(user_id="user1", session_id=session_id, new_message=content)
+        
+        for event in events:
+            if hasattr(event, 'content'):
+                if event.content.parts:
+                    for part in event.content.parts:
+                        if hasattr(part, 'text') and part.text:
+                            all_responses.append(part.text)
+                        if hasattr(part, 'function_call'):
+                            tool_calls.append(part.function_call.name)
+        
+        # Update session context with the results
+        self.update_session_context(session_id, self.current_session_context)
+        
+        # Get final session context
+        context = self.get_session_context(session_id)
+        
+        # Format the complete response
+        final_response = "# MCP Server Generation Results\n\n"
+        
+        if context.get("mcp_server"):
+            # If we have the final MCP server, show it prominently
+            final_response += "## Generated MCP Server Code:\n\n"
+            final_response += "```python\n"
+            final_response += context['mcp_server']
+            final_response += "\n```\n\n"
+            final_response += "✅ **MCP server generated successfully!**\n\n"
+            final_response += f"**Tools used:** {', '.join(tool_calls)}\n"
+        else:
+            # Show whatever progress we made
+            final_response += "## Workflow Progress:\n\n"
+            
+            if context.get("documentation"):
+                final_response += "### ✅ Step 1: Documentation Extracted\n"
+                final_response += f"{context['documentation'][:300]}...\n\n"
+            else:
+                final_response += "### ❌ Step 1: Documentation Extraction - Pending\n\n"
+            
+            if context.get("workflows"):
+                final_response += "### ✅ Step 2: Workflows Analyzed\n"
+                final_response += f"{context['workflows'][:300]}...\n\n"
+            else:
+                final_response += "### ❌ Step 2: Workflow Analysis - Pending\n\n"
+            
+            if context.get("mcp_server"):
+                final_response += "### ✅ Step 3: MCP Server Generated\n"
+            else:
+                final_response += "### ❌ Step 3: MCP Generation - Pending\n\n"
+            
+            # Add agent responses
+            if all_responses:
+                final_response += "## Agent Messages:\n\n"
+                final_response += "\n\n".join(all_responses)
+        
+        return final_response
     
     def ask(self, question: str):
         """Ask a question to the Gemini agent using ADK session and runner."""
