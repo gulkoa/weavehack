@@ -24,7 +24,7 @@ async def main() -> None:
 
     # --8<-- [start:A2ACardResolver]
 
-    base_url = 'http://localhost:9999'
+    base_url = 'http://localhost:10001'
 
     async with httpx.AsyncClient() as httpx_client:
         # Initialize A2ACardResolver
@@ -110,7 +110,7 @@ async def main() -> None:
             'message': {
                 'role': 'user',
                 'parts': [
-                    {'kind': 'text', 'text': 'how much is 10 USD in INR?'}
+                    {'kind': 'text', 'text': 'Get the documentation for TMDB'}
                 ],
                 'messageId': uuid4().hex,
             },
@@ -119,7 +119,7 @@ async def main() -> None:
             id=str(uuid4()), params=MessageSendParams(**send_message_payload)
         )
 
-        response = await client.send_message(request)
+        response = await client.send_message(request, http_kwargs={"timeout": 100000})
         print(response.model_dump(mode='json', exclude_none=True))
         # --8<-- [end:send_message]
 
