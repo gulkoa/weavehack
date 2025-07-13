@@ -1,23 +1,19 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Globe, FileCode, Loader2, CheckCircle, Copy, Package, Download } from 'lucide-react';
+import { MessageSquare, Loader2, CheckCircle, Copy, Package } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
 interface FormData {
-  apiUrl?: string;
-  openApiSpec?: string;
+  query: string;
 }
 
 interface GenerationResult {
   manifestUrl: string;
   downloadUrl: string;
-  code?: string;
-  filename?: string;
 }
 
 const GeneratorCard = () => {
-  const [activeTab, setActiveTab] = useState<'url' | 'spec'>('url');
   const [isGenerating, setIsGenerating] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [result, setResult] = useState<GenerationResult | null>(null);
@@ -38,20 +34,6 @@ const GeneratorCard = () => {
     }
   };
 
-  const downloadCode = (code: string, filename: string) => {
-    const blob = new Blob([code], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    toast.success(`Downloaded ${filename}`);
-  };
-
   const onSubmit = async (data: FormData) => {
     setIsGenerating(true);
     setLogs([]);
@@ -61,104 +43,49 @@ const GeneratorCard = () => {
     try {
       addLog('Started MCP server generation...');
       
-      // Prepare the request message for root_agent
-      const requestMessage = activeTab === 'url' 
-        ? `Generate an MCP server for the API at ${data.apiUrl}`
-        : `Generate an MCP server from this OpenAPI specification:\n\n${data.openApiSpec}`;
+      // Use the natural language query directly
+      const inputText = data.query;
 
-      addLog('Connecting to Root Agent...');
-
-      // Create A2A protocol request
-      const a2aRequest = {
+      addLog('Connecting to MCP generation agent...');
+      
+      // A2A Agent Communication
+      const a2aPayload = {
         message: {
-          role: "user",
-          content: requestMessage
+          role: 'user',
+          content: inputText
         }
       };
 
-      addLog('Analyzing API structure...');
+      addLog('Sending request to MCP generation agent...');
       
-      // Call the root_agent through the proxy
-      const response = await axios.post('http://127.0.0.1:10000/tasks/send', a2aRequest, {
+      // Send to the root agent that orchestrates the full process
+      const response = await axios.post('http://127.0.0.1:10000/tasks/send', a2aPayload, {
         timeout: 600000000, // Increased timeout for complex operations
         headers: {
           'Content-Type': 'application/json'
         }
       });
 
-      // Poll for task completion
-      const taskId = response.data.id;
-      let taskResult = response.data;
+      addLog('Received response from MCP generation agent...');
       
-      while (taskResult.status?.state !== 'completed' && taskResult.status?.state !== 'failed') {
-        addLog('Processing request...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      if (response.data?.result?.artifacts?.[0]?.parts?.[0]?.text) {
+        const mcpServerCode = response.data.result.artifacts[0].parts[0].text;
+        addLog('MCP server generated successfully!');
         
-        const statusResponse = await axios.get(`/root-agent/tasks/${taskId}`);
-        taskResult = statusResponse.data;
-        
-        // Check for intermediate messages
-        if (taskResult.status?.message?.content?.text) {
-          addLog(taskResult.status.message.content.text);
-        }
-      }
-
-      if (taskResult.status?.state === 'failed') {
-        throw new Error(taskResult.status?.message?.content?.text || 'Task failed');
-      }
-
-      addLog('MCP server generated successfully!');
-      
-      // Extract the result from the artifacts
-      const artifactText = taskResult.artifacts?.[0]?.parts?.[0]?.text || '';
-      
-      // Extract code from the response
-      // Look for code blocks in the artifact text
-      let extractedCode = '';
-      let filename = 'mcp_server.py';
-      
-      // Try to extract code between ```python and ``` markers
-      const codeMatch = artifactText.match(/```python\n([\s\S]*?)```/);
-      if (codeMatch) {
-        extractedCode = codeMatch[1].trim();
-      } else {
-        // If no code blocks found, check if the entire artifact is code
-        // Look for import statements or function definitions
-        if (artifactText.includes('import ') || artifactText.includes('def ') || artifactText.includes('class ')) {
-          extractedCode = artifactText;
-        }
-      }
-      
-      // Extract filename if mentioned in the response
-      const filenameMatch = artifactText.match(/filename:\s*([^\n]+)/i);
-      if (filenameMatch) {
-        filename = filenameMatch[1].trim();
-      }
-      
-      setResult({
-        manifestUrl: '/root-agent/generated/manifest.json',
-        downloadUrl: '/root-agent/generated/download',
-        code: extractedCode,
-        filename: filename
-      });
-
-      // Show the full response in logs
-      if (artifactText) {
-        addLog('Response from Root Agent:');
-        const logLines = artifactText.split('\n').slice(0, 10); // Show first 10 lines in logs
-        logLines.forEach((line: string) => {
-          if (line.trim()) addLog(line);
+        // Set result with the MCP server code
+        setResult({
+          manifestUrl: `MCP Server for query: "${data.query}"`,
+          downloadUrl: mcpServerCode
         });
-        if (artifactText.split('\n').length > 10) {
-          addLog('... (see generated code below)');
-        }
+      } else {
+        throw new Error('No MCP server code found in agent response');
       }
 
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || 'Generation failed';
+      const errorMessage = err.response?.data?.error?.message || err.message || 'MCP server generation failed';
       setError(errorMessage);
       addLog(`Error: ${errorMessage}`);
-      toast.error('Generation failed. Please ensure the Root Agent is running on port 10000.');
+      toast.error('MCP server generation failed. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -173,81 +100,49 @@ const GeneratorCard = () => {
 
   if (result) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-card border border-border rounded-lg p-8 shadow-xl">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-card border border-border rounded-none p-8 shadow-xl">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-primary rounded-none flex items-center justify-center mx-auto mb-4">
               <Package className="w-8 h-8 text-primary-foreground" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">Your MCP Server is Ready!</h2>
-            <p className="text-muted-foreground text-sm">Your generated MCP server code and configuration are shown below.</p>
+            <h2 className="text-2xl font-bold text-foreground mb-2">MCP Server Ready</h2>
+            <p className="text-muted-foreground text-sm">Your complete MCP server Python file has been generated.</p>
           </div>
 
           <div className="space-y-4">
-            {/* Generated Code Display */}
-            {result.code && (
-              <div className="bg-muted rounded-lg p-4 border border-border">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-medium text-foreground">Generated MCP Server Code</h3>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => copyToClipboard(result.code!)}
-                      className="text-primary hover:text-primary/80 transition-colors flex items-center space-x-1"
-                    >
-                      <Copy size={16} />
-                      <span className="text-sm">Copy</span>
-                    </button>
-                    <button
-                      onClick={() => downloadCode(result.code!, result.filename || 'mcp_server.py')}
-                      className="text-primary hover:text-primary/80 transition-colors flex items-center space-x-1"
-                    >
-                      <Download size={16} />
-                      <span className="text-sm">Download</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="bg-slate-900 rounded-lg p-4 max-h-96 overflow-y-auto">
-                  <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono">
-                    <code>{result.code}</code>
-                  </pre>
-                </div>
+            <div className="bg-muted rounded-none p-4 border border-border">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-foreground">Your Request</label>
+                <button
+                  onClick={() => copyToClipboard(result.manifestUrl)}
+                  className="text-primary hover:text-primary/80 transition-colors"
+                >
+                  <Copy size={16} />
+                </button>
               </div>
-            )}
+              <code className="text-sm text-muted-foreground break-all font-mono">{result.manifestUrl}</code>
+            </div>
 
-            <div className="bg-muted rounded-lg p-4 border border-border">
-              <h3 className="text-sm font-medium text-foreground mb-2">Quick-start for Claude</h3>
-              <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono">
-{`# 1. Save the generated code as ${result.filename || 'mcp_server.py'}
-# 2. Install dependencies:
-pip install mcp
-
-# 3. Add to your Claude configuration:
-{
-  "mcpServers": {
-    "custom-api": {
-      "command": "python",
-      "args": ["${result.filename || 'mcp_server.py'}"],
-      "env": {
-        "API_KEY": "your-api-key"
-      }
-    }
-  }
-}`}
-              </pre>
-              <button
-                onClick={() => copyToClipboard(`# Save as ${result.filename || 'mcp_server.py'}...`)}
-                className="mt-2 text-primary hover:text-primary/80 transition-colors text-sm"
-              >
-                Copy configuration
-              </button>
+            <div className="bg-muted rounded-none p-4 border border-border max-h-96 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-foreground">MCP Server Code</label>
+                <button
+                  onClick={() => copyToClipboard(result.downloadUrl)}
+                  className="text-primary hover:text-primary/80 transition-colors"
+                >
+                  <Copy size={16} />
+                </button>
+              </div>
+              <div className="text-sm text-muted-foreground whitespace-pre-wrap font-mono">{result.downloadUrl}</div>
             </div>
           </div>
 
           <button
             onClick={handleReset}
-            className="w-full mt-6 bg-secondary hover:bg-secondary/80 text-secondary-foreground py-3 px-4 rounded-lg transition-colors"
+            className="w-full mt-6 bg-secondary hover:bg-secondary/80 text-secondary-foreground py-3 px-4 rounded-none transition-colors"
           >
-            Generate Another Server
+            Generate Another MCP Server
           </button>
         </div>
       </div>
@@ -256,88 +151,51 @@ pip install mcp
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="bg-card border border-border rounded-lg overflow-hidden shadow-xl">
-        {/* Tabs */}
-        <div className="flex border-b border-border">
-          <button
-            onClick={() => setActiveTab('url')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center space-x-2 ${
-              activeTab === 'url'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-            }`}
-          >
-            <Globe size={18} />
-            <span>API URL</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('spec')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center space-x-2 ${
-              activeTab === 'spec'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-            }`}
-          >
-            <FileCode size={18} />
-            <span>OpenAPI Spec</span>
-          </button>
-        </div>
-
+      <div className="bg-card border border-cyan-400 rounded-none overflow-hidden">
         {/* Form Content */}
         <div className="p-6">
+          <div className="mb-6 text-center">
+            <MessageSquare className="w-12 h-12 text-primary mx-auto mb-3" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">MCP Server Generator</h2>
+            <p className="text-sm text-muted-foreground">
+              Describe what API integration you need and get a complete MCP server Python file
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {activeTab === 'url' ? (
-              <div>
-                <label htmlFor="apiUrl" className="block text-sm font-medium text-foreground mb-2">
-                  API Endpoint URL
-                </label>
-                <input
-                  {...register('apiUrl', {
-                    required: 'API URL is required',
-                    pattern: {
-                      value: /^https?:\/\/.+/,
-                      message: 'Please enter a valid URL'
-                    }
-                  })}
-                  type="url"
-                  id="apiUrl"
-                  placeholder="https://api.example.com"
-                  className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-                />
-                {errors.apiUrl && (
-                  <p className="mt-2 text-sm text-destructive">{errors.apiUrl.message}</p>
-                )}
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Enter the URL of your API endpoint
-                </p>
-              </div>
-            ) : (
-              <div>
-                <label htmlFor="openApiSpec" className="block text-sm font-medium text-foreground mb-2">
-                  OpenAPI Specification
-                </label>
-                <textarea
-                  {...register('openApiSpec', {
-                    required: 'OpenAPI specification is required'
-                  })}
-                  id="openApiSpec"
-                  rows={8}
-                  placeholder="Paste your OpenAPI 3.x specification (YAML or JSON)..."
-                  className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all font-mono text-sm"
-                />
-                {errors.openApiSpec && (
-                  <p className="mt-2 text-sm text-destructive">{errors.openApiSpec.message}</p>
-                )}
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Supports both YAML and JSON formats
-                </p>
-              </div>
-            )}
+            <div>
+              <label htmlFor="query" className="block text-sm font-medium text-foreground mb-2">
+                What MCP server would you like to create?
+              </label>
+              <textarea
+                {...register('query', {
+                  required: 'Please describe what MCP server you need',
+                  minLength: {
+                    value: 10,
+                    message: 'Please provide more details (at least 10 characters)'
+                  }
+                })}
+                id="query"
+                rows={4}
+                placeholder="Examples:
+• Create an MCP server for the GitHub API to manage repositories
+• Generate MCP tools for Stripe payment processing
+• Build MCP server for Twitter API integration
+• I need MCP tools for OpenAI's text generation API"
+                className="w-full px-4 py-3 bg-input border border-cyan-400/40 focus:border-cyan-400 rounded-none text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-cyan-400/60 focus:shadow-lg focus:shadow-cyan-400/20 transition-all text-sm"
+              />
+              {errors.query && (
+                <p className="mt-2 text-sm text-destructive">{errors.query.message}</p>
+              )}
+              <p className="mt-2 text-sm text-muted-foreground">
+                Describe the API you want to integrate and what functionality you need
+              </p>
+            </div>
 
             <button
               type="submit"
               disabled={isGenerating}
-              className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-primary-foreground py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+              className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-primary-foreground py-3 px-6 rounded-none font-medium transition-colors flex items-center justify-center space-x-2 border border-cyan-400 hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-400/40"
             >
               {isGenerating ? (
                 <>
@@ -346,7 +204,7 @@ pip install mcp
                 </>
               ) : (
                 <>
-                  <FileCode size={18} />
+                  <MessageSquare size={18} />
                   <span>Generate MCP Server</span>
                 </>
               )}
@@ -356,13 +214,13 @@ pip install mcp
 
         {/* Live Logs */}
         {logs.length > 0 && (
-          <div className="border-t border-slate-600 bg-slate-900">
+          <div className="border-t border-cyan-400/30 bg-slate-900">
             <div className="p-4">
               <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center space-x-2">
-                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse shadow-lg shadow-cyan-400/60"></div>
                 <span>Generation Progress</span>
               </h3>
-              <pre className="text-sm text-slate-400 bg-slate-800 rounded-lg p-3 max-h-40 overflow-y-auto font-mono">
+              <pre className="text-sm text-slate-400 bg-slate-800 rounded-none p-3 max-h-40 overflow-y-auto font-mono">
                 {logs.join('\n')}
               </pre>
             </div>
@@ -371,7 +229,7 @@ pip install mcp
 
         {/* Error State */}
         {error && (
-          <div className="border-t border-slate-600 bg-red-900 p-4">
+          <div className="border-t border-cyan-400/30 bg-red-900 p-4">
             <div className="flex items-center space-x-2 text-red-400">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
