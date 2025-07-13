@@ -1,42 +1,30 @@
 import ast
-from typing import List, Dict, Any, Optional
-import uvicorn
-    
-# doc_agent_server.py
-
-import os
-import sys
-from typing import Dict
-
-import uvicorn
-from a2a.server.apps import A2AFastAPIApplication
-from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+import json
+from typing import Any, Dict, List, Optional
 
 # --- ADK and A2A imports ---
 from google.adk.agents import Agent
+from python_a2a import A2AServer, TaskState, TaskStatus, agent, run_server, skill
 
 
-def validate_python_syntax(self, code: str) -> Dict[str, Any]:
+def validate_python_syntax(code: str) -> Dict[str, Any]:
     """Validates Python code syntax and returns validation result."""
     try:
         ast.parse(code)
         return {"valid": True, "error": None}
     except SyntaxError as e:
-        return {
-            "valid": False, 
-            "error": f"Syntax error at line {e.lineno}: {e.msg}"
-        }
+        return {"valid": False, "error": f"Syntax error at line {e.lineno}: {e.msg}"}
     except Exception as e:
         return {"valid": False, "error": str(e)}
 
 
 # --- Define the ADK Agent ---
-doc_agent = Agent(
+workflow_agent = Agent(
     name="workflow_generator",
     model="gemini-2.0-flash",
     description="Analyzes REST API descriptions and generates logical workflows",
     instruction="""
-"You are an expert API workflow analyst. Analyze the following REST API description and identify:
+You are an expert API workflow analyst. Analyze the following REST API description and identify:
 
 1. All available endpoints and their HTTP methods
 2. Required and optional parameters for each endpoint
@@ -48,9 +36,6 @@ doc_agent = Agent(
 8. Rate limiting or special considerations
 
 Focus heavily on identifying USEFUL WORKFLOWS that solve real problems by combining multiple API calls.
-
-API Description:
-{api_description}
 
 Return your analysis as a JSON object with this structure:
 {{
@@ -122,33 +107,142 @@ Be extremely thorough in identifying workflows. Think about:
     tools=[validate_python_syntax],
 )
 
-# --- Define AgentSkill and AgentCard for A2A ---
-skill = AgentSkill(
-                id="generate_workflows",
-                name="Generate API Workflows",
-                description="Analyzes REST API descriptions and identifies useful workflows",
-                tags=["api", "workflow", "analysis", "rest"],
-                examples=[
-                    "Analyze this API and generate workflows",
-                    "What workflows can I create with this REST API?",
-                    "Generate useful workflows from this API documentation",
-                ],
+
+@agent(
+    name="Workflow Generator Agent",
+    description="Analyzes REST API descriptions and generates logical workflows using ADK with Gemini",
+    version="1.0.0",
+)
+class WorkflowGeneratorAgent(A2AServer):
+
+    def __init__(self):
+        super().__init__()
+        self.adk_agent = workflow_agent
+
+    @skill(
+        name="Validate Python Syntax",
+        description="Validates Python code syntax and returns validation result",
+        tags=["python", "validation", "syntax", "ast"],
+    )
+    def validate_python_syntax(self, code: str) -> Dict[str, Any]:
+        """Validates Python code syntax and returns validation result."""
+        try:
+            ast.parse(code)
+            return {"valid": True, "error": None}
+        except SyntaxError as e:
+            return {
+                "valid": False,
+                "error": f"Syntax error at line {e.lineno}: {e.msg}",
+            }
+        except Exception as e:
+            return {"valid": False, "error": str(e)}
+
+    @skill(
+        name="Generate API Workflows",
+        description="Analyzes REST API descriptions and identifies useful workflows using ADK with Gemini",
+        tags=["api", "workflow", "analysis", "rest", "adk", "gemini"],
+    )
+    def generate_workflows(self, api_description: str) -> str:
+        """
+        Analyze REST API description and generate logical workflows using ADK agent.
+
+        Args:
+            api_description (str): The REST API description to analyze
+
+        Returns:
+            str: Generated workflow analysis as JSON string
+        """
+        try:
+            # Use the ADK agent to analyze the API description and generate workflows
+            result = self.adk_agent.ask(
+                f"Analyze this REST API description and generate workflows:\n\n{api_description}"
             )
 
-agent_card = AgentCard (
-        name="Workflow Generator Agent",
-        description="Analyzes REST API descriptions and generates logical workflows",
-        url=f"http://localhost:10002/",
-        version="1.0.0",
-        capabilities=AgentCapabilities(streaming=True),
-        skills=[skill],
-        defaultInputModes=["text", "text/plain"],
-        defaultOutputModes=["text", "text/plain"],
-    ),
+            # Try to parse as JSON to validate format
+            try:
+                parsed = json.loads(str(result))
+                return json.dumps(parsed, indent=2)
+            except json.JSONDecodeError:
+                # If not valid JSON, wrap in a structured response
+                return json.dumps(
+                    {
+                        "generated_content": str(result),
+                        "note": "Generated by ADK agent - may need formatting adjustment",
+                        "source": "gemini-2.0-flash",
+                        "api_description": (
+                            api_description[:200] + "..."
+                            if len(api_description) > 200
+                            else api_description
+                        ),
+                    },
+                    indent=2,
+                )
 
-# --- Expose agent as an A2A FastAPI server ---
-server = A2AFastAPIApplication(agent_card=agent_card, http_handler=doc_agent)
+        except Exception as e:
+            return json.dumps(
+                {"error": f"Failed to generate workflows: {str(e)}", "workflows": []}
+            )
+
+    def handle_task(self, task):
+        """Handle incoming A2A tasks for workflow generation."""
+        try:
+            # Extract API description from the task message
+            message_data = task.message or {}
+            content = message_data.get("content", {})
+
+            if isinstance(content, dict):
+                text = content.get("text", "")
+            else:
+                text = str(content)
+
+            if not text.strip():
+                task.status = TaskStatus(
+                    state=TaskState.INPUT_REQUIRED,
+                    message={
+                        "role": "agent",
+                        "content": {
+                            "type": "text",
+                            "text": "Please provide a REST API description to analyze and generate workflows from.",
+                        },
+                    },
+                )
+                return task
+
+            # Check if the input looks like a request for syntax validation
+            if text.strip().startswith("validate:"):
+                code_to_validate = text.strip()[9:].strip()
+                validation_result = self.validate_python_syntax(code_to_validate)
+
+                if validation_result["valid"]:
+                    response_text = "✅ **Python Code Validation: PASSED**\n\nThe provided code has valid Python syntax."
+                else:
+                    response_text = f"❌ **Python Code Validation: FAILED**\n\nError: {validation_result['error']}"
+
+            else:
+                # Generate workflows from API description using ADK
+                workflows = self.generate_workflows(text.strip())
+                response_text = f"**Generated API Workflows (via ADK)**\n\n```json\n{workflows}\n```"
+
+            # Create response
+            task.artifacts = [{"parts": [{"type": "text", "text": response_text}]}]
+            task.status = TaskStatus(state=TaskState.COMPLETED)
+
+        except Exception as e:
+            task.status = TaskStatus(
+                state=TaskState.FAILED,
+                message={
+                    "role": "agent",
+                    "content": {
+                        "type": "text",
+                        "text": f"Error generating workflows: {str(e)}",
+                    },
+                },
+            )
+
+        return task
+
 
 if __name__ == "__main__":
-    print("Starting doc_agent server at http://localhost:10002/")
-    uvicorn.run(server.build(), host="localhost", port=10001)
+    print("Starting Workflow Generator Agent server at http://localhost:10002/")
+    agent = WorkflowGeneratorAgent()
+    run_server(agent, port=10002)

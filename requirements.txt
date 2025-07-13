@@ -9,3 +9,4 @@ anthropic
 crewai
 stagehand
 stagehand-py
+python-a2a

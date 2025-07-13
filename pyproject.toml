@@ -10,6 +10,7 @@ dependencies = [
     "exa-py>=1.14.16",
     "google-adk>=1.6.1",
     "openai>=1.95.1",
+    "python-a2a>=0.5.9",
     "python-dotenv>=1.1.1",
     "stagehand-py>=0.3.10",
     "uvicorn>=0.35.0",
