@@ -6,9 +6,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "a2a-sdk>=0.2.11",
-    "crewai>=0.141.0",
+    "crewai==0.134.0",
     "exa-py>=1.14.16",
-    "fly-python-sdk",
     "google-adk>=1.6.1",
     "httpx>=0.28.1",
     "openai>=1.95.1",

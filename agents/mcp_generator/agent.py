@@ -27,31 +27,13 @@ mcp_agent = Agent(
     model="gemini-2.5-pro",
     description="Generates Python MCP tool code from workflow analysis using LLM",
     instruction="""
-<<<<<<< HEAD
-    
-You are an expert Python developer tasked with creating Model Context Protocol (MCP) tools based on a workflow analysis. Your goal is to implement these workflows as robust, practical Python functions using FastMCP.
-=======
 You are an expert Python developer creating MCP (Model Context Protocol) tools from workflow analysis.
 You MUST use FastMCP to develop the MCP tools.
->>>>>>> df2dbe0 (Integrate Fly)
 
 Here is the workflow analysis you will be working with:
 
 Please follow these instructions to create FastMCP tools:
 
-<<<<<<< HEAD
-1. Analyze the provided workflow and identify distinct processes that can be implemented as separate functions.
-
-2. For each identified workflow, create a Python function that implements the complete process using FastMCP. Each function should:
-   a. Be completely synchronous (no async/await)
-   b. Handle authentication properly using the auth information provided in the workflow analysis
-   c. Include comprehensive error handling and retry logic
-   d. Implement the complete workflow by combining multiple API calls if necessary
-   e. Return meaningful results in a structured format
-   f. Include proper docstrings with parameter descriptions
-   g. Use only standard libraries (requests, json, time, urllib, etc.)
-   h. Handle common edge cases (network errors, rate limits, invalid responses)
-=======
 Sample FastMCP code:
 ```python
 from fastmcp import FastMCP
@@ -92,7 +74,6 @@ Guidelines for code generation:
 - YOU ONLY HAVE ACCESS TO THE FOLLOWING LIBRARIES (apart from standard libraries):
     - FastMCP
     - requests
->>>>>>> df2dbe0 (Integrate Fly)
 
 3. Implement proper FastMCP decorators and structures for each function.
 
