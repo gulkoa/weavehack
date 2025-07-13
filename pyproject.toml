@@ -8,11 +8,17 @@ dependencies = [
     "a2a-sdk>=0.2.11",
     "crewai>=0.141.0",
     "exa-py>=1.14.16",
+    "fly-python-sdk",
     "google-adk>=1.6.1",
+    "httpx>=0.28.1",
     "openai>=1.95.1",
     "python-a2a>=0.5.9",
     "python-dotenv>=1.1.1",
+    "requests>=2.32.4",
     "stagehand-py>=0.3.10",
     "uvicorn>=0.35.0",
     "weave>=0.51.56",
 ]
+
+[tool.uv.workspace]
+members = ["mcp_boilerplate"]

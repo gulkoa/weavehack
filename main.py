@@ -3,6 +3,10 @@
 Main server launcher for all A2A agents.
 Boots up all agents concurrently on their designated ports.
 """
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 import os
 import signal
@@ -11,7 +15,10 @@ import threading
 import time
 from contextlib import contextmanager
 
+import weave
 from python_a2a import A2AClient, run_server
+
+# weave.init("rochan-hm-self/quickstart_playground")
 
 # Add the parent directory to the path to import agents
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

@@ -4,11 +4,10 @@ from typing import Any, Dict, List, Optional
 
 # --- ADK and A2A imports ---
 from google.adk.agents import Agent
-from python_a2a import A2AServer, TaskState, TaskStatus, agent, run_server, skill
-
-from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
 from google.genai import types
+from python_a2a import A2AServer, TaskState, TaskStatus, agent, run_server, skill
 
 
 def validate_python_syntax(code: str) -> Dict[str, Any]:
@@ -28,13 +27,19 @@ mcp_agent = Agent(
     model="gemini-2.5-pro",
     description="Generates Python MCP tool code from workflow analysis using LLM",
     instruction="""
+<<<<<<< HEAD
     
 You are an expert Python developer tasked with creating Model Context Protocol (MCP) tools based on a workflow analysis. Your goal is to implement these workflows as robust, practical Python functions using FastMCP.
+=======
+You are an expert Python developer creating MCP (Model Context Protocol) tools from workflow analysis.
+You MUST use FastMCP to develop the MCP tools.
+>>>>>>> df2dbe0 (Integrate Fly)
 
 Here is the workflow analysis you will be working with:
 
 Please follow these instructions to create FastMCP tools:
 
+<<<<<<< HEAD
 1. Analyze the provided workflow and identify distinct processes that can be implemented as separate functions.
 
 2. For each identified workflow, create a Python function that implements the complete process using FastMCP. Each function should:
@@ -46,6 +51,48 @@ Please follow these instructions to create FastMCP tools:
    f. Include proper docstrings with parameter descriptions
    g. Use only standard libraries (requests, json, time, urllib, etc.)
    h. Handle common edge cases (network errors, rate limits, invalid responses)
+=======
+Sample FastMCP code:
+```python
+from fastmcp import FastMCP
+
+mcp = FastMCP("Demo 🚀") # This is the name of the MCP server
+
+@mcp.tool
+def add(a: int, b: int) -> int:
+    "Add two numbers"
+    return a + b
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+Return a JSON array where each object has:
+{{
+    "name": "function_name",
+    "description": "Brief description of what this tool does",
+    "workflow_name": "name of the workflow this implements",
+    "python_body": "complete Python function code as a string",
+    "complexity": "simple|medium|complex",
+    "estimated_api_calls": "number of API calls this function makes"
+}}
+
+Guidelines for code generation:
+- Create one function per workflow
+- Use FastMCP to develop the MCP tools. DO NOT USE ANY OTHER MCP LIBRARY.
+- Include proper authentication handling in each function
+- Add retry logic for network failures
+- Handle rate limiting with appropriate delays
+- Validate input parameters
+- Return structured, useful results
+- Include error context in exceptions
+- Add logging or status updates for complex workflows
+- Use descriptive variable names
+- Include examples in docstrings
+- YOU ONLY HAVE ACCESS TO THE FOLLOWING LIBRARIES (apart from standard libraries):
+    - FastMCP
+    - requests
+>>>>>>> df2dbe0 (Integrate Fly)
 
 3. Implement proper FastMCP decorators and structures for each function.
 
@@ -97,25 +144,25 @@ class MCPCodeGeneratorAgent(A2AServer):
             }
         except Exception as e:
             return {"valid": False, "error": str(e)}
-        
-    
+
     def ask(self, question: str):
         """Ask a question to the Gemini agent using ADK session and runner."""
         session_service = InMemorySessionService()
         session = session_service.create_session_sync(
-            app_name="my_app",
-            user_id="user1",
-            session_id="mysession"
+            app_name="my_app", user_id="user1", session_id="mysession"
         )
-        runner = Runner(agent=self.adk_agent, app_name="my_app", session_service=session_service)
-        content = types.Content(role='user', parts=[types.Part(text=question)])
+        runner = Runner(
+            agent=self.adk_agent, app_name="my_app", session_service=session_service
+        )
+        content = types.Content(role="user", parts=[types.Part(text=question)])
 
         # 3. Send the question and print the response
-        events = runner.run(user_id="user1", session_id="mysession", new_message=content)
+        events = runner.run(
+            user_id="user1", session_id="mysession", new_message=content
+        )
         for event in events:
             if event.is_final_response():
                 return event.content.parts[0].text
-
 
     @skill(
         name="Generate MCP Tools",

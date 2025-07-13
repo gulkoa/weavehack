@@ -1,7 +1,12 @@
 import json
 import os
+import shutil
+import subprocess
+import tempfile
 import threading
 import time
+import uuid
+from contextlib import redirect_stdout
 from datetime import datetime
 from typing import Any, Dict, Optional
 from wsgiref import types
@@ -35,6 +40,7 @@ network.add("mcp_generator", "http://localhost:10003")
 
 from pydantic import BaseModel, Field
 
+
 def ask_agent(agent_type: str, question: str) -> str:
     # Get the agent from the network
     agent = network.get_agent(agent_type)
@@ -59,6 +65,84 @@ def generate_workflows(question: str) -> str:
 def generate_mcp(question: str) -> str:
     """Generates MCP server code from a given workflow"""
     return ask_agent("mcp_generator", question)
+
+
+@tool("save_code")
+def save_code(code: str) -> str:
+    """Saves the code to a file"""
+
+    fly_toml = f"""
+app = 'mcp-boilerplate-{str(uuid.uuid4())[:8]}'
+primary_region = 'sjc'
+
+[build]
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+""".strip()
+
+    # Use context manager for temporary directory
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            # Create the mcp_boilerplate directory path
+            mcp_dir = os.path.join(temp_dir, "mcp_boilerplate")
+
+            # Copy mcp_boilerplate to temp dir
+            shutil.copytree("mcp_boilerplate", mcp_dir)
+
+            # Write main.py in the mcp_boilerplate directory
+            main_path = os.path.join(mcp_dir, "main.py")
+            with open(main_path, "w") as f:
+                f.write(code + "\n")
+
+            # Write fly.toml in the mcp_boilerplate directory
+            fly_path = os.path.join(mcp_dir, "fly.toml")
+            with open(fly_path, "w") as f:
+                f.write(fly_toml + "\n")
+
+            # Create deploy log path
+            deploy_log_path = os.path.join(temp_dir, "deploy.log")
+
+            # Run the "fly deploy" command from the mcp_boilerplate directory
+            with open(deploy_log_path, "w") as f:
+                result = subprocess.run(
+                    ["fly", "launch", "-y"],
+                    cwd=mcp_dir,  # Run from the mcp_boilerplate directory
+                    stdout=f,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                )
+
+            # Read the deploy output from the file
+            with open(deploy_log_path, "r") as f:
+                output = f.read()
+
+            print("--------------------------------")
+            print(output)
+
+            # Write the deploy output to the current working directory
+            with open(os.path.join(os.getcwd(), "deploy.log"), "w") as f:
+                f.write(output)
+
+            # Extract the URL from the output
+            if "Visit your newly deployed app at" in output:
+                url = output.split("Visit your newly deployed app at")[1].strip()
+                return url
+            else:
+                return f"Error deploying: {output}"
+
+        except Exception as e:
+            return f"Error saving code: {str(e)}"
 
 
 llm = LLM(
@@ -87,19 +171,23 @@ For technical requests:
 
 4. Once you have the result from the MCP Generator Agent, provide the user with the generated MCP server code
 
+Finally, once/if you have generated the MCP server code, save it to a file using the save_code tool.
+This will give you the deployment URL of the MCP server. Return the URL to the user.
+
 Important notes:
 - The Document Extractor Agent is expensive to use, so use it sparingly and only when necessary.
 - Always provide context from the previous agent to the next agent in the sequence.
 - Do not call agents without proper context from the previous step.
 
 """.strip(),
-    tools=[extract_documentation, generate_workflows, generate_mcp],
+    tools=[extract_documentation, generate_workflows, generate_mcp, save_code],
     verbose=True,
-    llm=llm
+    llm=llm,
 )
 
+
 class Output(BaseModel):
-    python_code: str=Field(description="Python code describing MCP server")
+    python_code: str = Field(description="Python code describing MCP server")
 
 
 @agent(
@@ -214,7 +302,7 @@ class RootAgent(A2AServer):
             description="Answer the question: {user_input}",
             expected_output="A response to the question",
             agent=self.adk_agent,
-            output_pydantic=Output
+            output_pydantic=Output,
         )
         crew = Crew(
             agents=[self.adk_agent],
