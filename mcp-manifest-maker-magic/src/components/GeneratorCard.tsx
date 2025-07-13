@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Globe, FileCode, Loader2, CheckCircle, Copy, Package } from 'lucide-react';
+import { Globe, FileCode, Loader2, CheckCircle, Copy, Package, Download } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -12,6 +12,8 @@ interface FormData {
 interface GenerationResult {
   manifestUrl: string;
   downloadUrl: string;
+  code?: string;
+  filename?: string;
 }
 
 const GeneratorCard = () => {
@@ -34,6 +36,20 @@ const GeneratorCard = () => {
     } catch (err) {
       toast.error('Failed to copy to clipboard');
     }
+  };
+
+  const downloadCode = (code: string, filename: string) => {
+    const blob = new Blob([code], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    toast.success(`Downloaded ${filename}`);
   };
 
   const onSubmit = async (data: FormData) => {
@@ -96,20 +112,46 @@ const GeneratorCard = () => {
       // Extract the result from the artifacts
       const artifactText = taskResult.artifacts?.[0]?.parts?.[0]?.text || '';
       
-      // Parse the response to extract relevant information
-      // For now, we'll use placeholder URLs, but in a real implementation,
-      // these would be extracted from the agent's response
+      // Extract code from the response
+      // Look for code blocks in the artifact text
+      let extractedCode = '';
+      let filename = 'mcp_server.py';
+      
+      // Try to extract code between ```python and ``` markers
+      const codeMatch = artifactText.match(/```python\n([\s\S]*?)```/);
+      if (codeMatch) {
+        extractedCode = codeMatch[1].trim();
+      } else {
+        // If no code blocks found, check if the entire artifact is code
+        // Look for import statements or function definitions
+        if (artifactText.includes('import ') || artifactText.includes('def ') || artifactText.includes('class ')) {
+          extractedCode = artifactText;
+        }
+      }
+      
+      // Extract filename if mentioned in the response
+      const filenameMatch = artifactText.match(/filename:\s*([^\n]+)/i);
+      if (filenameMatch) {
+        filename = filenameMatch[1].trim();
+      }
+      
       setResult({
         manifestUrl: '/root-agent/generated/manifest.json',
-        downloadUrl: '/root-agent/generated/download'
+        downloadUrl: '/root-agent/generated/download',
+        code: extractedCode,
+        filename: filename
       });
 
       // Show the full response in logs
       if (artifactText) {
         addLog('Response from Root Agent:');
-        artifactText.split('\n').forEach((line: string) => {
+        const logLines = artifactText.split('\n').slice(0, 10); // Show first 10 lines in logs
+        logLines.forEach((line: string) => {
           if (line.trim()) addLog(line);
         });
+        if (artifactText.split('\n').length > 10) {
+          addLog('... (see generated code below)');
+        }
       }
 
     } catch (err: any) {
@@ -131,39 +173,60 @@ const GeneratorCard = () => {
 
   if (result) {
     return (
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <div className="bg-card border border-border rounded-lg p-8 shadow-xl">
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mx-auto mb-4">
               <Package className="w-8 h-8 text-primary-foreground" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">Your MCP Server</h2>
-            <p className="text-muted-foreground text-sm">Generated manifest and download link will appear here after successful generation.</p>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Your MCP Server is Ready!</h2>
+            <p className="text-muted-foreground text-sm">Your generated MCP server code and configuration are shown below.</p>
           </div>
 
           <div className="space-y-4">
-            <div className="bg-muted rounded-lg p-4 border border-border">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-foreground">Manifest URL</label>
-                <button
-                  onClick={() => copyToClipboard(result.manifestUrl)}
-                  className="text-primary hover:text-primary/80 transition-colors"
-                >
-                  <Copy size={16} />
-                </button>
+            {/* Generated Code Display */}
+            {result.code && (
+              <div className="bg-muted rounded-lg p-4 border border-border">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium text-foreground">Generated MCP Server Code</h3>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => copyToClipboard(result.code!)}
+                      className="text-primary hover:text-primary/80 transition-colors flex items-center space-x-1"
+                    >
+                      <Copy size={16} />
+                      <span className="text-sm">Copy</span>
+                    </button>
+                    <button
+                      onClick={() => downloadCode(result.code!, result.filename || 'mcp_server.py')}
+                      className="text-primary hover:text-primary/80 transition-colors flex items-center space-x-1"
+                    >
+                      <Download size={16} />
+                      <span className="text-sm">Download</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-4 max-h-96 overflow-y-auto">
+                  <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono">
+                    <code>{result.code}</code>
+                  </pre>
+                </div>
               </div>
-              <code className="text-sm text-muted-foreground break-all font-mono">{result.manifestUrl}</code>
-            </div>
+            )}
 
             <div className="bg-muted rounded-lg p-4 border border-border">
               <h3 className="text-sm font-medium text-foreground mb-2">Quick-start for Claude</h3>
               <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono">
-{`// Add to your Claude configuration
+{`# 1. Save the generated code as ${result.filename || 'mcp_server.py'}
+# 2. Install dependencies:
+pip install mcp
+
+# 3. Add to your Claude configuration:
 {
   "mcpServers": {
     "custom-api": {
-      "command": "node",
-      "args": ["path/to/server.js"],
+      "command": "python",
+      "args": ["${result.filename || 'mcp_server.py'}"],
       "env": {
         "API_KEY": "your-api-key"
       }
@@ -172,7 +235,7 @@ const GeneratorCard = () => {
 }`}
               </pre>
               <button
-                onClick={() => copyToClipboard(`// Add to your Claude configuration...`)}
+                onClick={() => copyToClipboard(`# Save as ${result.filename || 'mcp_server.py'}...`)}
                 className="mt-2 text-primary hover:text-primary/80 transition-colors text-sm"
               >
                 Copy configuration

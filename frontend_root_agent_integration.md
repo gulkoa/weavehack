@@ -64,9 +64,25 @@ The frontend now sends requests in the following format:
    python test_frontend_root_agent.py
    ```
 
+## Features Added
+
+### Code Display and Download
+- The frontend now extracts Python code from agent responses
+- Displays generated MCP server code with syntax highlighting
+- Provides "Copy" button to copy code to clipboard
+- Provides "Download" button to save code as a Python file
+- Automatically detects filename from agent response or defaults to `mcp_server.py`
+
+### Code Extraction Logic
+The frontend handles multiple response formats:
+1. Code wrapped in markdown code blocks (```python...```)
+2. Direct Python code without markdown
+3. Responses with filename specifications
+
 ## Next Steps
 
-1. Parse actual manifest URLs and download links from agent responses
-2. Implement proper error handling for specific agent failures
-3. Add support for streaming logs from agents
-4. Store generated MCP servers and provide real download functionality
+1. Add syntax highlighting library for better code display
+2. Support multiple file generation (e.g., requirements.txt, config files)
+3. Implement proper error handling for specific agent failures
+4. Add support for streaming logs from agents
+5. Store generated MCP servers in a backend service

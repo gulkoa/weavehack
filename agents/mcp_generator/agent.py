@@ -39,8 +39,9 @@ Given the following workflow analysis, create useful MCP tools as Python functio
 6. Include proper docstrings with parameter descriptions
 7. Use only standard libraries (requests, json, time, urllib, etc.)
 8. Handle common edge cases (network errors, rate limits, invalid responses)
+9. Use FastMCP
 
-For each workflow in the analysis, generate corresponding Python functions that implement the complete workflow.
+For each workflow in the analysis, generate corresponding Python functions with FastMCP that implement the complete workflow.
 
 Return a JSON array where each object has:
 {{

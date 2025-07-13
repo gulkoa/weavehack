@@ -33,6 +33,7 @@ network.add("document_extractor", "http://localhost:10001")
 network.add("workflow_generator", "http://localhost:10002")
 network.add("mcp_generator", "http://localhost:10003")
 
+from pydantic import BaseModel, Field
 
 def ask_agent(agent_type: str, question: str) -> str:
     # Get the agent from the network
@@ -99,6 +100,9 @@ DO NOT CALL THE AGENTS WITHOUT PROPER CONTEXT.
     verbose=True,
     llm=llm
 )
+
+class Output(BaseModel):
+    python_code: str=Field(description="Python code describing MCP server")
 
 
 @agent(
@@ -213,13 +217,16 @@ class RootAgent(A2AServer):
             description="Answer the question: {user_input}",
             expected_output="A response to the question",
             agent=self.adk_agent,
+            output_pydantic=Output
         )
         crew = Crew(
             agents=[self.adk_agent],
             tasks=[task],
             verbose=True,
         )
-        return crew.kickoff({"user_input": question})
+        output = crew.kickoff({"user_input": question})
+        print(str(output))
+        return output.python_code
 
 
 if __name__ == "__main__":
