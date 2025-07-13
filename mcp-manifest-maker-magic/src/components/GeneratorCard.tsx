@@ -67,8 +67,11 @@ const GeneratorCard = () => {
       });
 
       addLog('Received response from MCP generation agent...');
+
+      const data = response.data;
+      console.log({data});
       
-      if (response.data?.result?.artifacts?.[0]?.parts?.[0]?.text) {
+      if (response.data?.artifacts?.[0]?.parts?.[0]?.text) {
         const mcpServerCode = response.data.result.artifacts[0].parts[0].text;
         addLog('MCP server generated successfully!');
         
