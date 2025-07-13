@@ -1,0 +1,36 @@
+{
+  "name": "example_weather_functions-mcp",
+  "version": "1.0.0",
+  "description": "Auto-generated MCP server from example_weather_functions",
+  "author": "MCP Auto-Generator",
+  "license": "MIT",
+  "server": {
+    "command": "python",
+    "args": [
+      "example_weather_functions_mcp_server.py"
+    ],
+    "env": {}
+  },
+  "tools": [
+    {
+      "name": "get_weather_forecast",
+      "description": "Get weather forecast for a specific location."
+    },
+    {
+      "name": "get_current_weather",
+      "description": "Get current weather conditions for a specific location."
+    },
+    {
+      "name": "search_locations",
+      "description": "Search for locations by name to get coordinates."
+    },
+    {
+      "name": "get_weather_alerts",
+      "description": "Get weather alerts and warnings for a location."
+    },
+    {
+      "name": "calculate_weather_summary",
+      "description": "Calculate a human-readable weather summary from raw weather data."
+    }
+  ]
+}
