@@ -43,6 +43,9 @@ Thumbs.db
 *.tar.gz
 *.rar
 
+# Large executables
+speakeasy-cli/
+
 # Logs
 *.log
 
