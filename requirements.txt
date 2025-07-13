@@ -6,3 +6,6 @@ asyncio
 a2a-sdk
 google-genai
 anthropic
+crewai
+stagehand
+stagehand-py
