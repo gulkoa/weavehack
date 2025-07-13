@@ -105,5 +105,5 @@ agent_card = AgentCard (
 server = A2AFastAPIApplication(agent_card=agent_card, http_handler=doc_agent)
 
 if __name__ == "__main__":
-    print("Starting doc_agent server at http://localhost:10001/")
+    print("Starting doc_agent server at http://localhost:10003/")
     uvicorn.run(server.build(), host="localhost", port=10001)

@@ -19,18 +19,18 @@ from tools.doc_extrator_tools import (
 #     project="rochan-hm-self/quickstart_playground",
 # )
 
-# llm = LLM(
-#     model="openrouter/deepseek/deepseek-chat-v3-0324:free",
-#     timeout=10,
-#     api_base="https://openrouter.ai/api/v1",
-#     api_key=os.getenv("OPENROUTER_API_KEY"),
-# )
 llm = LLM(
-    model="openai/deepseek-ai/DeepSeek-V3-0324",
-    api_base="https://api.inference.wandb.ai/v1",
-    api_key=os.getenv("WANDB_OPENAI_API_KEY"),
-    extra_headers={"OpenAI-Project": "rochan-hm-self/quickstart_playground"},
+    model="openrouter/deepseek/deepseek-chat-v3-0324:free",
+    timeout=100,
+    api_base="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
 )
+# llm = LLM(
+#     model="openai/deepseek-ai/DeepSeek-V3-0324",
+#     api_base="https://api.inference.wandb.ai/v1",
+#     api_key=os.getenv("WANDB_OPENAI_API_KEY"),
+#     extra_headers={"OpenAI-Project": "rochan-hm-self/quickstart_playground"},
+# )
 
 # Setup the agent
 agent = Agent(
