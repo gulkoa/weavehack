@@ -1,0 +1,7 @@
+google-adk
+requests
+json5
+pydantic
+asyncio
+a2a-sdk
+google-genai
