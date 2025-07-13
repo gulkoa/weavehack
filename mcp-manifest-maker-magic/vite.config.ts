@@ -8,6 +8,13 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      '/root-agent': {
+        target: 'http://localhost:10000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/root-agent/, ''),
+      },
+    },
   },
   plugins: [
     react(),

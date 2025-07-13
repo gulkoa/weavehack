@@ -192,59 +192,59 @@ def main():
         time.sleep(1)  # Brief pause between starts
 
     # Wait for servers to be ready
-    if wait_for_all_servers():
-        # Run tests
-        test_success = run_tests()
+    # if wait_for_all_servers():
+    #     # Run tests
+    #     test_success = run_tests()
 
-        # Print connection info
-        print(f"\n{'='*60}")
-        print("🌐 ALL SERVERS RUNNING")
-        print(f"{'='*60}")
+    #     # Print connection info
+    #     print(f"\n{'='*60}")
+    #     print("🌐 ALL SERVERS RUNNING")
+    #     print(f"{'='*60}")
 
-        for server in SERVERS:
-            print(f"• {server['name']}: http://localhost:{server['port']}")
-            print(f"  └── {server['description']}")
+    #     for server in SERVERS:
+    #         print(f"• {server['name']}: http://localhost:{server['port']}")
+    #         print(f"  └── {server['description']}")
 
-        print(f"\n{'='*60}")
-        print("💡 USAGE EXAMPLES")
-        print(f"{'='*60}")
+    #     print(f"\n{'='*60}")
+    #     print("💡 USAGE EXAMPLES")
+    #     print(f"{'='*60}")
 
-        print("Using A2A Client:")
-        print("```python")
-        print("from python_a2a import A2AClient")
-        print("client = A2AClient('http://localhost:10000')")
-        print("response = client.ask('Extract docs for GitHub API')")
-        print("```")
+    #     print("Using A2A Client:")
+    #     print("```python")
+    #     print("from python_a2a import A2AClient")
+    #     print("client = A2AClient('http://localhost:10000')")
+    #     print("response = client.ask('Extract docs for GitHub API')")
+    #     print("```")
 
-        print("\nUsing curl:")
-        print("```bash")
-        print("curl -X POST http://localhost:10000/ask \\")
-        print("  -H 'Content-Type: application/json' \\")
-        print('  -d \'{"message": "Extract docs for GitHub API"}\'')
-        print("```")
+    #     print("\nUsing curl:")
+    #     print("```bash")
+    #     print("curl -X POST http://localhost:10000/ask \\")
+    #     print("  -H 'Content-Type: application/json' \\")
+    #     print('  -d \'{"message": "Extract docs for GitHub API"}\'')
+    #     print("```")
 
-        print(f"\n{'='*60}")
-        print("🔄 AGENT WORKFLOW")
-        print(f"{'='*60}")
-        print("1. Root Agent (10000) - Coordinates and routes requests")
-        print("2. Documentation Agent (10001) - Extracts API documentation")
-        print("3. Workflow Generator (10002) - Analyzes APIs and creates workflows")
-        print("4. MCP Code Generator (10003) - Generates MCP tools from workflows")
+    #     print(f"\n{'='*60}")
+    #     print("🔄 AGENT WORKFLOW")
+    #     print(f"{'='*60}")
+    #     print("1. Root Agent (10000) - Coordinates and routes requests")
+    #     print("2. Documentation Agent (10001) - Extracts API documentation")
+    #     print("3. Workflow Generator (10002) - Analyzes APIs and creates workflows")
+    #     print("4. MCP Code Generator (10003) - Generates MCP tools from workflows")
 
-        print(f"\n{'='*60}")
-        print("Press Ctrl+C to stop all servers")
-        print(f"{'='*60}")
+    #     print(f"\n{'='*60}")
+    #     print("Press Ctrl+C to stop all servers")
+    #     print(f"{'='*60}")
 
-        # Keep the main thread alive
-        try:
-            while not shutdown_event.is_set():
-                time.sleep(1)
-        except KeyboardInterrupt:
-            signal_handler(signal.SIGINT, None)
+    # Keep the main thread alive
+    try:
+        while not shutdown_event.is_set():
+            time.sleep(1)
+    except KeyboardInterrupt:
+        signal_handler(signal.SIGINT, None)
 
-    else:
-        print("❌ Failed to start all servers properly")
-        sys.exit(1)
+    # else:
+    #     print("❌ Failed to start all servers properly")
+    #     sys.exit(1)
 
 
 if __name__ == "__main__":

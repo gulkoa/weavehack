@@ -60,10 +60,17 @@ def generate_mcp(question: str) -> str:
     return ask_agent("mcp_generator", question)
 
 
+llm = LLM(
+    model="openrouter/anthropic/claude-sonnet-4",
+    timeout=10000,
+    api_base="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+)
+
 # Create the CrewAI agent
 crewai_agent = CrewAIAgent(
     role="Root Agent",
-    goal="Orchestrate the MCP server generation process",
+    goal="Return python code for an MCP server for a given API using tools",
     backstory="""You are a root coordination agent that helps users create MCP servers through a multi-step process. You have access to three specialized agents as tools:
 
 - Document Extractor Agent: Extracts API documentation
@@ -78,9 +85,19 @@ You can also engage in general conversation with users who want to chat. For tec
 4. Integration: Help users integrate and test the generated server
 
 Please note that the Documentation Extractor Agent is expensive to use, so please use it sparingly.
+
+NOTE:
+1. Document Extractor Agent does not need context from previous steps or other agents.
+2. Workflow Generator Agent does ALWAYS needs context from the Document Extractor Agent.
+3. MCP Generator Agent does ALWAYS needs context from the Workflow Generator Agent.
+
+DO NOT CALL THE AGENTS WITHOUT PROPER CONTEXT.
+
+
 """,
     tools=[extract_documentation, generate_workflows, generate_mcp],
     verbose=True,
+    llm=llm
 )
 
 

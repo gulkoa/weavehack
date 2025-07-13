@@ -20,7 +20,7 @@ from tools.doc_extrator_tools import (
 # )
 
 llm = LLM(
-    model="openrouter/deepseek/deepseek-chat-v3-0324:free",
+    model="openrouter/deepseek/deepseek-chat-v3-0324",
     timeout=100,
     api_base="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY"),

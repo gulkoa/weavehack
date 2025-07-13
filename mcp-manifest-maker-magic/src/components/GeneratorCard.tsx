@@ -45,35 +45,78 @@ const GeneratorCard = () => {
     try {
       addLog('Started MCP server generation...');
       
-      const payload = activeTab === 'url' 
-        ? { apiUrl: data.apiUrl }
-        : { openApiSpec: data.openApiSpec };
+      // Prepare the request message for root_agent
+      const requestMessage = activeTab === 'url' 
+        ? `Generate an MCP server for the API at ${data.apiUrl}`
+        : `Generate an MCP server from this OpenAPI specification:\n\n${data.openApiSpec}`;
+
+      addLog('Connecting to Root Agent...');
+
+      // Create A2A protocol request
+      const a2aRequest = {
+        message: {
+          role: "user",
+          content: requestMessage
+        }
+      };
 
       addLog('Analyzing API structure...');
       
-      // Simulate real-time logs
-      setTimeout(() => addLog('Generating MCP manifest...'), 1000);
-      setTimeout(() => addLog('Creating server configuration...'), 2000);
-      setTimeout(() => addLog('Validating generated code...'), 3000);
-
-      // Simulate API call (replace with actual endpoint)
-      const response = await axios.post('/api/generate-mcp', payload, {
-        timeout: 30000,
+      // Call the root_agent through the proxy
+      const response = await axios.post('http://127.0.0.1:10000/tasks/send', a2aRequest, {
+        timeout: 600000000, // Increased timeout for complex operations
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
+
+      // Poll for task completion
+      const taskId = response.data.id;
+      let taskResult = response.data;
+      
+      while (taskResult.status?.state !== 'completed' && taskResult.status?.state !== 'failed') {
+        addLog('Processing request...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const statusResponse = await axios.get(`/root-agent/tasks/${taskId}`);
+        taskResult = statusResponse.data;
+        
+        // Check for intermediate messages
+        if (taskResult.status?.message?.content?.text) {
+          addLog(taskResult.status.message.content.text);
+        }
+      }
+
+      if (taskResult.status?.state === 'failed') {
+        throw new Error(taskResult.status?.message?.content?.text || 'Task failed');
+      }
 
       addLog('MCP server generated successfully!');
       
-      // Simulate successful response
+      // Extract the result from the artifacts
+      const artifactText = taskResult.artifacts?.[0]?.parts?.[0]?.text || '';
+      
+      // Parse the response to extract relevant information
+      // For now, we'll use placeholder URLs, but in a real implementation,
+      // these would be extracted from the agent's response
       setResult({
-        manifestUrl: 'https://api.example.com/mcp-servers/abc123/manifest.json',
-        downloadUrl: 'https://api.example.com/mcp-servers/abc123/download'
+        manifestUrl: '/root-agent/generated/manifest.json',
+        downloadUrl: '/root-agent/generated/download'
       });
+
+      // Show the full response in logs
+      if (artifactText) {
+        addLog('Response from Root Agent:');
+        artifactText.split('\n').forEach((line: string) => {
+          if (line.trim()) addLog(line);
+        });
+      }
 
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || err.message || 'Generation failed';
       setError(errorMessage);
       addLog(`Error: ${errorMessage}`);
-      toast.error('Generation failed. Please try again.');
+      toast.error('Generation failed. Please ensure the Root Agent is running on port 10000.');
     } finally {
       setIsGenerating(false);
     }
